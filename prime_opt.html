@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Super Crivello Radical n - Offset Modulare</title>
+  <style>
+    body { font-family: monospace; padding: 20px; line-height: 1.4; }
+    input { font-size: 16px; margin: 5px 0; width: 300px; }
+    button { font-size: 16px; cursor: pointer; background: #2ecc71; border: none; padding: 8px 15px; color: white; border-radius: 4px; }
+    button:hover { background: #27ae60; }
+    pre { background: #f4f4f4; padding: 10px; max-height: 300px; overflow-y: auto; border: 1px solid #ddd; }
+    .stats { color: #2c3e50; font-weight: bold; margin-bottom: 10px; border-left: 4px solid #2ecc71; padding-left: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>Eliminazione Radical $n$ (Ottimizzazione Offset)</h2>
+
+<label>
+  Inserisci n (es: 1e8, 1e12, 1e15):<br>
+  <input type="text" id="numero" value="1000000">
+</label>
+<br>
+<button onclick="esegui()">Esegui Scansione</button>
+
+<div class="stats" id="info"></div>
+
+<h3>Log Intercettazioni (Solo per n < 10.000)</h3>
+<pre id="eliminati"></pre>
+
+<h3>Numeri rimasti nell'intervallo [ n - √n , n ]</h3>
+<pre id="rimasti"></pre>
+
+<script>
+function esegui() {
+    let nInput = document.getElementById("numero").value;
+    let n = BigInt(Math.floor(Number(nInput)));
+    
+    const outEliminati = document.getElementById("eliminati");
+    const outRimasti = document.getElementById("rimasti");
+    const outInfo = document.getElementById("info");
+
+    outEliminati.textContent = "Calcolo in corso...";
+    outRimasti.textContent = "";
+    
+    if (n < 2n) {
+        outEliminati.textContent = "Inserire un numero >= 2";
+        return;
+    }
+
+    const t0 = performance.now();
+
+    // 1. Parametri della finestra
+    const r = BigInt(Math.floor(Math.sqrt(Number(n))));
+    const lowerBound = n - r;
+    const ampiezzaFinestra = Number(r) + 1;
+
+    // 2. Allocazione Bitset (0 = potenziale primo, 1 = eliminato)
+    let bitset = new Uint8Array(ampiezzaFinestra);
+    let log = [];
+
+    // 3. Scansione Ottimizzata
+    for (let d = 2n; d <= r; d++) {
+        
+        // --- TUA LOGICA DI AGGIORNAMENTO ---
+        
+        // 1. Calcola l'offset iniziale usando l'intuizione del modulo
+        let resto = lowerBound % d;
+        let offset = (resto === 0n) ? 0n : d - resto;
+
+        // 2. Punto di ingresso come indice nell'array (0 corrisponde a lowerBound)
+        let startIdx = Number(offset);
+
+        // Se stiamo eliminando multipli, dobbiamo assicurarci di non eliminare 
+        // il divisore d stesso se d >= lowerBound (accade per n molto piccoli)
+        if (lowerBound + BigInt(startIdx) === d) {
+            startIdx += Number(d);
+        }
+
+        // 3. Salto dinamico nell'array
+        // j è un Number, il che rende il ciclo estremamente rapido
+        let dNum = Number(d);
+        for (let j = startIdx; j < ampiezzaFinestra; j += dNum) {
+            if (bitset[j] === 0) {
+                bitset[j] = 1;
+                
+                // Logga solo se n è piccolo per evitare crash del browser
+                if (n < 10000n) {
+                    log.push(`${d} elimina ${lowerBound + BigInt(j)}`);
+                }
+            }
+        }
+        
+        // ----------------------------------
+    }
+
+    const t1 = performance.now();
+
+    // 4. Estrazione Numeri Rimasti
+    let rimasti = [];
+    for (let i = 0; i < ampiezzaFinestra; i++) {
+        if (bitset[i] === 0) {
+            let valore = lowerBound + BigInt(i);
+            if (valore >= 2n) {
+                rimasti.push(valore.toString());
+            }
+        }
+    }
+
+    // 5. Output Finale 
+    outInfo.innerHTML = `
+        Tempo di esecuzione: ${tempo} secondi<br>
+        Intervallo: [${lowerBound.toLocaleString()}, ${n.toLocaleString()}]<br>
+        Ampiezza (√n): ${ampiezzaFinestra.toLocaleString()}<br>
+        Numeri rimasti: ${rimasti.length}
+    `;
+
+    outEliminati.textContent = n < 10000n ? log.join("\n") : "Log disattivato (n troppo grande).";
+    outRimasti.textContent = rimasti.join(", ");
+}
+</script>
+
+</body>
+</html>

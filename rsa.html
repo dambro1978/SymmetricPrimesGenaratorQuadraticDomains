@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Generatore Primi + Chiavi RSA</title>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    input, button { font-size: 16px; margin: 5px 0; padding: 6px; }
+    pre, textarea { background: #f4f4f4; padding: 10px; width: 100%; box-sizing: border-box; font-family: monospace; font-size: 14px; }
+    pre { max-height: 250px; overflow-y: auto; }
+    textarea { height: 350px; resize: vertical; }
+  </style>
+</head>
+<body>
+
+<h2>Eliminazione multipli + Generazione RSA (e=65537)</h2>
+
+<label>Inserisci n: <input type="number" id="numero" value="1000" min="2"></label>
+<br>
+<button onclick="esegui()">Esegui</button>
+
+<h3>Eliminazioni</h3>
+<pre id="eliminati"></pre>
+
+<h3>Numeri rimasti nell’intervallo [ n − √n , n ]</h3>
+<pre id="rimasti"></pre>
+
+<h3>Database Chiavi RSA (BigInt)</h3>
+<textarea id="rsaOutput" readonly></textarea>
+
+<script>
+/**
+ * Logica Matematica con BigInt
+ */
+function gcd(a, b) {
+  while (b !== 0n) {
+    a %= b;
+    [a, b] = [b, a];
+  }
+  return a;
+}
+
+function modInverse(e, phi) {
+  let [old_r, r] = [e, phi];
+  let [old_s, s] = [1n, 0n];
+  while (r !== 0n) {
+    let q = old_r / r;
+    [old_r, r] = [r, old_r - q * r];
+    [old_s, s] = [s, old_s - q * s];
+  }
+  return (old_s % phi + phi) % phi;
+}
+
+/**
+ * Generazione chiavi con e = 65537
+ */
+function generaTutteLeChiaviRSA(primi) {
+  const output = document.getElementById("rsaOutput");
+  if (primi.length < 2) {
+    output.value = "Servono almeno 2 numeri primi nell'intervallo.";
+    return;
+  }
+
+  let risultati = [];
+  let contatore = 1;
+  const E_FISSO = 65537n;
+
+  for (let i = 0; i < primi.length; i++) {
+    for (let j = i + 1; j < primi.length; j++) {
+      let p = BigInt(primi[i]);
+      let q = BigInt(primi[j]);
+      let n = p * q;
+      let phi = (p - 1n) * (q - 1n);
+
+      let e = E_FISSO;
+      // Controllo coprimatà (necessario per validità RSA)
+      if (gcd(e, phi) !== 1n) {
+        e = 3n; 
+        while (e < phi && gcd(e, phi) !== 1n) e += 2n;
+      }
+
+      if (e >= phi) continue;
+      let d = modInverse(e, phi);
+
+      risultati.push(
+`RSA #${contatore} (p=${p}, q=${q})
+n = ${n}
+φ(n) = ${phi}
+Esponente e: ${e}
+Chiave Pubblica: (${e}, ${n})
+Chiave Privata:  (${d}, ${n})
+------------------------------------------------`
+      );
+      contatore++;
+    }
+  }
+  output.value = risultati.join("\n");
+}
+
+/**
+ * Il tuo algoritmo di crivello originale
+ */
+function eliminaMultipliContatore(n) {
+  const r = Math.floor(Math.sqrt(n));
+  const lowerBound = n - r;
+  let eliminati = new Set();
+  let log = [];
+
+  for (let d = r; d >= 2; d--) {
+    let k = Math.floor(n / d);
+    while (k >= d) {
+      const prodotto = d * k;
+      if (prodotto < lowerBound) break;
+      if (!eliminati.has(prodotto)) {
+        eliminati.add(prodotto);
+        log.push(`${d} × ${k} elimina ${prodotto}`);
+      }
+      k--;
+    }
+  }
+  return { eliminati, log, lowerBound };
+}
+
+function esegui() {
+  const n = parseInt(document.getElementById("numero").value, 10);
+  const outEliminati = document.getElementById("eliminati");
+  const outRimasti = document.getElementById("rimasti");
+  
+  const risultato = eliminaMultipliContatore(n);
+  outEliminati.textContent = risultato.log.join("\n");
+
+  let rimasti = [];
+  for (let i = risultato.lowerBound; i <= n; i++) {
+    if (i >= 2 && !risultato.eliminati.has(i)) rimasti.push(i);
+  }
+  outRimasti.textContent = rimasti.join(", ");
+
+  generaTutteLeChiaviRSA(rimasti);
+}
+</script>
+</body>
+</html>
